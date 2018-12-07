@@ -34,12 +34,15 @@
 
 				</section>
 				<section>
-					<h2>Droplet-based sequencing</h2>
-					<p>Droplet: Cell + Beads</p>
-					<p>Beads carry a unique <b>cell-barcode</b></p>
-					<img src="images/10x.png" alt="Smiley face" height="400">
-					<p><a href="https://youtu.be/zQoHc6PtIFk?t=210">Droplet Generation Video</a><p>
-				</section>
+					<section>
+						<h2>Droplet-based sequencing</h2>
+						<img src="images/10x.png" alt="Smiley face" height="400">
+						<!-- <p><a href="https://youtu.be/zQoHc6PtIFk?t=225">Droplet Generation Video</a><p> -->
+					</section>
+					<section>
+						<iframe width="852" height="480" src="https://www.youtube.com/embed/zQoHc6PtIFk?start=225&mute=1" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+					</section>
+			    </section>
 				<section>
 					<h2>R1-fastq</h2>
 					16bp <span style="color:red">cell-barcode</span>
@@ -187,11 +190,10 @@
 			    	<h2>Option 2</h2>
 					<ul>
 						<li>1bp errors are pretty likely</li>
-						<li>let's find all cell-barcodes 1bp away from an abundant barcode</li>
+						<li>find all cell-barcodes 1bp away from abundant barcodes</li>
 						<li><a href="https://en.wikipedia.org/wiki/BK-tree">BK-Trees</a> for fast lookup</li>
 						<li>Neighborhood Graph</li>
 						<br>
-						
 					</ul>
 			    </section>
 			    <section>
@@ -239,12 +241,14 @@
 				<section>
 					<section>
 						<h3>Estimating the error rate</h3>
-						Rough estimate of the sequencing error (dont do this)
+						Rough estimate of the sequencing error (<b>BIASED</b>)
 						<ul>
-						<li># reads without errors: $n_0$</li>
-						<li># reads with one error: $n_1$</li>
-						<li>$\frac{n_1}{n_0} = \frac{(1-\epsilon)^{15} \cdot \epsilon \cdot 16}{(1-\epsilon)^{16}}= \frac{\epsilon \cdot 16}{1-\epsilon}$</li>
-						<li>$\epsilon = \frac{n_1/n_0}{n_1/n_0+16}$</li>
+						<li><p class="fragment fade-in"># reads without errors: $n_0$</p></li>
+						<li><p class="fragment fade-in"># reads with one error: $n_1$</p></li>
+						<li><p class="fragment fade-in">
+						     $\frac{n_1}{n_0} = \frac{(1-\epsilon)^{15} \cdot \epsilon \cdot 16}{(1-\epsilon)^{16}}= \frac{\epsilon \cdot 16}{1-\epsilon}$
+						   </p></li>
+						<li><p class="fragment fade-in">$\epsilon = \frac{n_1/n_0}{n_1/n_0+16}$</p></li>
 						</ul>
 					</section>
 					<section>
