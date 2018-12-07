@@ -1,0 +1,302 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>reveal.js</title>
+
+		<link rel="stylesheet" href="css/reveal.css">
+		<link rel="stylesheet" href="css/theme/black.css">
+
+		<!-- Theme used for syntax highlighting of code -->
+		<link rel="stylesheet" href="lib/css/zenburn.css">
+
+		<!-- Printing and PDF exports -->
+		<script>
+			var link = document.createElement( 'link' );
+			link.rel = 'stylesheet';
+			link.type = 'text/css';
+			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+			document.getElementsByTagName( 'head' )[0].appendChild( link );
+		</script>
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				<section>
+					<h1> sc-RNA-seq</h1>
+					<h3> Cell Barcoding</h3>
+					<p>
+					<small><a href="mailto:mstrasse@systemsbiology.org">Michael Strasser </a></small>
+					</p>
+					<link rel="stylesheet" href="css/theme/league.css" id="theme">
+
+				</section>
+				<section>
+					<h2>Droplet-based sequencing</h2>
+					<p>Droplet: Cell + Beads</p>
+					<p>Beads carry a unique <b>cell-barcode</b></p>
+					<img src="images/10x.png" alt="Smiley face" height="400">
+					<p><a href="https://youtu.be/zQoHc6PtIFk?t=210">Droplet Generation Video</a><p>
+				</section>
+				<section>
+					<h2>R1-fastq</h2>
+					16bp <span style="color:red">cell-barcode</span>
+					10bp <span style="color:orange">UMI</span>
+					<small>
+						<p class="fragment fade-in" align="left">
+							@E00465:257:H75W5CCXY:6:1101:9851:1713 1:N:0:NCACAATG
+							<br>
+							<span style="color:red">CNCGGAGCATCTCCCA</span><span style="color:orange">CACAATCTTG</span>
+							<br>
+							+
+							<br>
+							A#AFF-FJJJJJJJJJJJJJJJJFF7
+						</p>
+						<p class="fragment fade-in" align="left">
+							@E00465:257:H75W5CCXY:6:1101:11434:1713 1:N:0:NCACAATG
+							<br>
+							<span style="color:red">GNTTCCAAGGGTCTCC</span><span style="color:orange">GTTAAGTATT</span>
+							<br>
+							+
+							<br>
+							A#AFFJJFJJJJJJJJJJJJJJFFJF
+						</p>
+						<p class="fragment fade-in" align="left">
+							@E00465:257:H75W5CCXY:6:1101:11860:1713 1:N:0:NCACAATG
+							<br>
+							<span style="color:red">GNAAAGCCATATGGTC</span><span style="color:orange">TACTAGCGTG</span>
+							<br>
+							+
+							<br>
+							A#AFFFJAJJFFJJJJJJFJJJJFFJ
+						</p>						
+					</small>
+				</section>
+				<section>
+					<section>
+						<h2>Cell Barcode Extraction</h2>
+						<ul>
+							<li>Annoyingly large number of reads (<b>132mio</b>)</li>
+							<li><p class="fragment fade-in">Chunking, then some map-reduce style extraction</p></li>
+						</ul>
+						<p class="fragment fade-in"><img src="images/map_reduce.dio.png" alt="Smiley face" height="300"></p>
+						
+					</section>
+					<section>
+						<small>
+						<pre><code class="python" data-trim>
+						def cellid_frequencies(chunkname):
+						    "counts the occurance of each barcode in the R1-fastq"
+						    def _extract_cellBC(): # little help from a generator
+						        for _,seq,_,_ in read_fastq_seqs_bare(chunkname):
+						            seq = seq.strip()
+						            cid, umi = seq[:16], seq[16:]
+						            yield cid
+						    
+						    c = Counter(_extract_cellBC())
+						    return c
+
+						# count the files seperately; takes about 1min
+						chunk_files = list(pathlib.Path(outdir).glob('*.gz'))
+						with mp.Pool(processes=8) as pool:
+						    results = pool.map(cellid_frequencies, chunk_files)
+
+						# merge the counters; ~20sec
+						final_count = Counter()
+						for c in results:
+						    final_count = final_count + c			
+
+						# for added geekiness:
+						final_count = reduce(add, results, Counter())					    		    
+						</code></pre></small>	
+					</section>
+				</section>
+
+				<section>
+					<h2></h2>
+					<pre><code class="python" data-trim>
+						print(f'Unique Cell-Barcodes: {len(final_count.items())}')
+					</code></pre>
+					Unique Cell-Barcodes: <b>2053894</b>
+
+					<p class="fragment fade-in">
+					That's a bit much, given that we expected about 10k cells to be sequenced. 
+					</p>
+					<p class="fragment fade-in">
+						<img src="images/droplets.png" alt="Smiley face" height="200">
+					</p>
+					<p class="fragment fade-in">What happened?</p>
+
+				</section>
+
+				<section>
+					<h2>Cell Barcode Frequencies</h2>
+					What's the number of reads per cell-barcode.
+					<img src="images/BC_frequency.png" alt="Smiley face" height="400">
+				</section>
+
+				<section>
+					<h2>Sequencing Errors</h2>
+					<ul>
+						<li>Illumina HiSeq: 0.1% errors</li>
+						<li><p class="fragment fade-in">Reads from the same cell get be “scattered” into different cell-barcodes</p></li>
+					</ul>
+					<p class="fragment fade-in">
+						<span style="color:red">GATTCCAAGGGTCTCC</span><span style="color:orange">GTTAAGTATT</span>
+						<span style="color:red">GATTCCAAG</span>A<span style="color:red">GTCTCC</span><span style="color:orange">CACAATCTTG</span>
+					</p>
+				</section>
+
+				<section>
+					<h2>Theory</h2>
+					<ul>
+						<li><p class="fragment fade-in">Getting no error in 16bp: $$(1-\epsilon)^{16}$$</p></li>
+						<li><p class="fragment fade-in">Getting one error in 16bp: $$16 \cdot \epsilon \cdot(1-\epsilon)^{15}$$</p></li>
+						<li><p class="fragment fade-in"><b>Binomial Distribution</b>: Bin$(n=16,p=\epsilon)$</p></li>						
+					</ul>
+				</section>
+
+				<section>
+					<h2>Theory</h2>
+					With Illumina's nominal error rate:
+					<br>
+						<table>
+						<thead>
+						</thead>
+						<tbody>
+							<tr>
+								<td><img src="images/binom_table.png" alt="Smiley face" height="300"></td>
+								<td><p class="fragment fade-in"><img src="images/BC_frequency_2.png" alt="Smiley face" height="300"></p></td>
+							</tr>
+						</tbody>
+					</table>		
+					
+				</section>
+			    <section>
+			    	<h2>What now</h2>
+					<ul>
+						<li><b>Option 1</b>: Discard all the 15mio reads on the right</li>
+						<li><p class="fragment fade-in"><b>Option 2</b>: fix the errors <i>in silico</i></p></li>
+					</ul>
+					<p><img src="images/BC_frequency_2.png" alt="Smiley face" height="300"></p>
+
+			    </section>
+			    <section>
+			    	<h2>Option 2</h2>
+					<ul>
+						<li>1bp errors are pretty likely</li>
+						<li>let's find all cell-barcodes 1bp away from an abundant barcode</li>
+						<li><a href="https://en.wikipedia.org/wiki/BK-tree">BK-Trees</a> for fast lookup</li>
+						<li>Neighborhood Graph</li>
+						<br>
+						
+					</ul>
+			    </section>
+			    <section>
+				    <section>
+				    	<h2>Neighborhood Graph</h2>
+				    	<img src="images/graph1.png" alt="Smiley face" height="300">
+				    	<br>Correct these barcodes to the abundant ones (AAA,TAT)
+				    </section>
+				    <section>
+				    	<h2>Neighborhood Graph</h2>
+				    	<img src="images/graph2.png" alt="Smiley face" height="300">
+				    	<br>Discard the AAT-read
+				    </section>
+				    <section>
+				    	<h2>Neighborhood Graph</h2>
+				    	<img src="images/graph3.png" alt="Smiley face" height="300">
+				    	<br>DONE
+				    </section>		
+			    </section>	
+				<section>
+				    <section data-background="#ffffff">
+				    	<h2>For 10x</h2>
+				    	<img src="images/stars.png" alt="Smiley face">
+				   	</section>
+				    <section data-background="#ffffff">
+				    	<h2>For 10x</h2>
+				    	<img src="images/stars2.png" alt="Smiley face">
+				   	</section>
+			   	</section>
+
+			    <section>
+			    	<h2>How much did we gain?</h2>
+					<table>
+						<thead>
+						</thead>
+						<tbody>
+							<tr>
+								<td><img src="images/correct_freqs2.png" alt="Smiley face" height="400"></td>
+								<td><p class="fragment fade-in"><img src="images/correct_freqs.png" alt="Smiley face" height="400"></p></td>
+							</tr>
+						</tbody>
+					</table>	
+			   	</section>
+
+				<section>
+					<section>
+						<h3>Estimating the error rate</h3>
+						Rough estimate of the sequencing error (dont do this)
+						<ul>
+						<li># reads without errors: $n_0$</li>
+						<li># reads with one error: $n_1$</li>
+						<li>$\frac{n_1}{n_0} = \frac{(1-\epsilon)^{15} \cdot \epsilon \cdot 16}{(1-\epsilon)^{16}}= \frac{\epsilon \cdot 16}{1-\epsilon}$</li>
+						<li>$\epsilon = \frac{n_1/n_0}{n_1/n_0+16}$</li>
+						</ul>
+					</section>
+					<section>
+						<img src="images/error_estimate.png" alt="Smiley face" height="500">
+						<p>It's a biased estimate, but at least in the ballpark</p>
+					</section>
+				</section>
+
+				<section>
+				<h2>Summary</h2>
+				<ul>
+					<li>Cell-barcode extraction straightforward</li>
+					<li>Some tricky details</li>
+					<ul>
+						<li>Sequencing Errors</li>
+						<li>Empty droplets // Ambient RNA</li>
+					</ul>
+					<li>Similar problems in UMIs, clone-barcodes</li>
+					<li><a href="https://github.com/CGATOxford/UMI-tools">UMI-tools</a></li>
+				</ul>
+
+				</section>
+			   	<section>
+			   		<h2>The End</h2>
+			   		<br>
+			   	</section>		   	
+			</div>
+		</div>
+
+		<script src="lib/js/head.min.js"></script>
+		<script src="js/reveal.js"></script>
+
+		<script>
+			// More info about config & dependencies:
+			// - https://github.com/hakimel/reveal.js#configuration
+			// - https://github.com/hakimel/reveal.js#dependencies
+			Reveal.initialize({
+				dependencies: [
+					{ src: 'plugin/markdown/marked.js' },
+					{ src: 'plugin/markdown/markdown.js' },
+					{ src: 'plugin/notes/notes.js', async: true },
+					{ src: 'plugin/math/math.js', async: true },
+					{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
+				],
+				math: {
+					mathjax: 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js',
+					config: 'TeX-AMS_HTML-full'  // See http://docs.mathjax.org/en/latest/config-files.html
+				},
+			});
+
+
+
+		</script>
+	</body>
+</html>
